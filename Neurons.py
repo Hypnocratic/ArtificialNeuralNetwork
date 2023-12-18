@@ -3,47 +3,55 @@ import numpy as np
 from typing import Callable
 
 class Neuron():
-    def __init__(self, w:np.array, b:float, position:int, activation_fn:Callable, activation_fn_prime:Callable,
-                 learning_rate:float, loss_fn_prime:Callable=None, last_neuron:bool=False, neurons:int=None) -> None:
-                 # arguments: weights, biases, activation function, activation function derivative,
-                 #            loss function derivative, if
+    def __init__(self, w:np.array, b:float, activation_fn:Callable, activation_fn_prime:Callable,
+                 learning_rate:float, last_neuron:bool=False, neurons:int=None, loss_fn_prime:Callable=None) -> None:
+        '''
+        w: numpy array of weights
+        b: neuron bias
+        activation_fn: Activation Function
+        activation_fn_prime: derivative of the activation function
+        learning_rate: learning rate
+        loss_fn_prime: derivative of loss function
+        last_neuron: wheather the neuron is the output neuron
+        neurons: number of neurons in same layer (optional if layer is not last)
+        '''
         self.w = w
         self.b = b
-        self.position = position
         self.activation_fn = activation_fn
         self.activation_fn_prime = activation_fn_prime
         self.learning_rate = learning_rate
-        self.loss_fn_prime = loss_fn_prime
         self.last_neuron = last_neuron
         self.neurons = neurons
+        self.loss_fn_prime = loss_fn_prime
     
+    def compute_linear(self, x:np.array) -> float:
+        z = np.sum(x * self.w) + self.b
+        return z
+
     def forward(self, x:np.array) -> float: # arguments: inputs
-        self.x = x
-        self.z = np.sum(x * self.w) + self.b
-        neuron_output = self.activation_fn(self.z)
+        neuron_output = self.activation_fn(self.compute_linear(x))
         return neuron_output
     
-    def backpropagation(self, forward_gradients:np.array, forward_weights:np.array, x:np.array, y:float=None) -> float:
-        _ = self.forward(x)
+    def linear_gradient(self, forward_gradients:np.array, forward_weights:np.array, x:np.array, y:float=None) -> float:
+        z = self.compute_linear(x)
         if self.last_neuron:
-            n_grad = 1/self.neurons * self.loss_fn_prime(self.z, y, self.neurons) * self.activation_fn_prime(self.z)
+            z_grad = 1/self.neurons * self.loss_fn_prime(z, y, self.neurons) * self.activation_fn_prime(z)
         else:
-            n_grad = np.sum(forward_gradients * forward_weights) * self.activation_fn_prime(self.z)
-        return n_grad
+            z_grad = np.sum(forward_gradients * forward_weights) * self.activation_fn_prime(z)
+        return z_grad
 
-    def weights_gradient(self, n_grad:float) -> np.array: # arguments: gradients from forward neurons
-        w_grad = n_grad * self.x
+    def weights_gradient(self, z_grad:float, x:np.array) -> np.array: # arguments: gradients from forward neurons
+        w_grad = z_grad * x
         return w_grad
 
-    def bias_gradient(self, n_grad:float) -> float: # arguments: gradients from forward neurons
-        b_grad = n_grad
+    def bias_gradient(self, z_grad:float) -> float: # arguments: gradients from forward neurons
+        b_grad = z_grad
         return b_grad
     
-    def gradient_descent(self, forward_gradients:np.array, forward_weights:np.array, x:np.array, y:float=None) -> None:
-        n_grad = self.backpropagation(forward_gradients, forward_weights, x, y)
-        w_grad = self.weights_gradient(n_grad)
-        b_grad = self.bias_gradient(n_grad)
-        self.w = self.w - (self.learning_rate * w_grad)
-        self.b = self.b - (self.learning_rate * b_grad)
-        print(f"weight gradient: {w_grad[0]}")
-        print(f"bias gradient: {b_grad}")
+    def update_parameters(self, forward_gradients:np.array, forward_weights:np.array, x:np.array, y:float=None) -> list:
+        z_grad = self.linear_gradient(forward_gradients, forward_weights, x, y)
+        w_grad = self.weights_gradient(z_grad, x)
+        b_grad = self.bias_gradient(z_grad)
+        updated_w = self.w - (self.learning_rate * w_grad)
+        updated_b = self.b - (self.learning_rate * b_grad)
+        return updated_w, updated_b
